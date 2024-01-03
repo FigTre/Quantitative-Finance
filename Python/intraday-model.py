@@ -1,5 +1,3 @@
-# intraday_ml_model_fit.py
-
 import datetime
 
 import numpy as np
