@@ -1,5 +1,3 @@
-# cross_validation.py
-
 from __future__ import print_function
 
 import datetime
