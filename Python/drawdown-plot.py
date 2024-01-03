@@ -1,8 +1,3 @@
-#!/usr/bin/python
-# -*- coding: utf-8 -*-
-
-# plot_drawdown.py
-
 import matplotlib.pyplot as plt
 import numpy as np
 
