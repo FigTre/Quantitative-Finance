@@ -1,59 +1,3 @@
-###############################################################################
-# R (http://r-project.org/) Quantitative Strategy Model Framework
-#
-# Copyright (c) 2009-2017
-# Peter Carl, Dirk Eddelbuettel, Brian G. Peterson, Jeffrey Ryan, and Joshua Ulrich 
-#
-# This library is distributed under the terms of the GNU Public License (GPL)
-# for full details see the file COPYING
-#
-# $Id$
-#
-###############################################################################
-
-
-
-#' Calculate a Deflated Sharpe Ratio using number of trials and portfolio moments
-#'
-#' Per Bailey and Lopex de Prado (2014), construct a Deflated Sharpe Ratio and 
-#' associated p-value based on an observed Sharpe ratio and information drawn
-#' from a series of trials (e.g. parameter optimization or other strategies tried
-#' before the candidate strategy)
-#' 
-#' @param portfolios string name of portfolio, or optionally a vector of portfolios, see DETAILS
-#' @param ... any other passtrhrough parameters
-#' @param strategy optional strategy specification that would contain more information on the process, default NULL
-#' @param trials optional number of trials,default NULL
-#' @param audit optional audit environment containing the results of parameter optimization or walk forward, default NULL
-#' @param env optional environment to find market data in, if required.
-#'
-#' @return
-#' 
-#' a \code{data.frame} containing:
-#' 
-#' \itemize{
-#'   \item{original observed Sharpe ratio}
-#'   \item{deflated Sharpe ratio}
-#'   \item{p-value of the deflated Sharpe ratio}
-#'   \item{number of trials used for adjustment}
-#' }
-#' 
-#' this object may change in the future, and may be classed so that we can include more information
-#' 
-#' @references 
-#' 
-#' Bailey, David H, and Marcos Lopez de Prado. 2014. "The Deflated Sharpe Ratio: 
-#' Correcting for Selection Bias, Backtest Overfitting and Non-Normality." 
-#' Journal of Portfolio Management 40 (5): 94-107. 
-#' http://www.davidhbailey.com/dhbpapers/deflated-sharpe.pdf
-#'
-#' @author Brian G. Peterson
-#' @importFrom TTR ROC
-#' @seealso \code{\link{SharpeRatio.haircut}}
-#' @rdname SharpeRatio.deflated
-#' @aliases deflatedSharpe SharpeRatio.deflated
-#' @export deflatedSharpe
-#' @export SharpeRatio.deflated
 deflatedSharpe <- SharpeRatio.deflated <- function( portfolios
                                                   , ...
                                                   , strategy=NULL
@@ -61,7 +5,7 @@ deflatedSharpe <- SharpeRatio.deflated <- function( portfolios
                                                   , audit=NULL
                                                   , env=.GlobalEnv)
 { 
-  #check inputs
+
   if(length(portfolios==1)&&is.null(audit)){
     stop("Not enough information to calculate.  \n",
          "Need either \n",
@@ -76,7 +20,7 @@ deflatedSharpe <- SharpeRatio.deflated <- function( portfolios
          "  - explicit number of trials \n")
   }
   
-  #initialize things we'll need:
+
   if(!is.null(strategy)){
     if(!is.strategy((strategy))){
       s<-try(getStrategy(strategy))
@@ -94,7 +38,7 @@ deflatedSharpe <- SharpeRatio.deflated <- function( portfolios
   if(trials==0 || !is.numeric(trials))
     stop("You must supply a numeric number of trials or a strategy with trials included")
   
-  #loop over portfolios
+
   dailySt<-list()
   for(portfolio in portfolios){
     if(!is.null(audit)){
@@ -121,9 +65,7 @@ deflatedSharpe <- SharpeRatio.deflated <- function( portfolios
     }
   }
   
-  #dailySt contains a list of dailyStats, we might need to combine a little more fully, unsure
-  
-  #take periodicty and number of observations from target portfolio
+ 
   p<-.getPortfolio(portfolios[1])
   
   freq <- periodicity(p$summary)$scale
@@ -148,20 +90,7 @@ deflatedSharpe <- SharpeRatio.deflated <- function( portfolios
   .deflatedSharpe(sharpe, nTrials=trials, varTrials, skew, kurt, numPeriods, periodsInYear) 
 } 
 
-#' internal implementation of Deflated Sharpe
-#'
-#' @param sharpe candidate (annualized) Sharpe Ratio
-#' @param nTrials numeric number or trials
-#' @param varTrials variance of Sharpe ratios of the trials
-#' @param skew skewness of the candidate 
-#' @param kurt non-excess kurtosis
-#' @param numPeriods total periods in the backtest
-#' @param periodsInYear number of periods in a year, default 252 (daily)
-#'
-#' @author Ilya Kipnis, Brian G. Peterson
-#' @references 
-#' https://quantstrattrader.wordpress.com/2015/09/24/
-#' @rdname SharpeRatio.deflated
+
 .deflatedSharpe <- function(sharpe, nTrials, varTrials, skew, kurt, numPeriods, periodsInYear=252) {
   emc <- 0.5772156649 # Euler-Mascheroni constant
   maxZ_t1 <- (1 - emc) * qnorm(1 - 1/nTrials)
