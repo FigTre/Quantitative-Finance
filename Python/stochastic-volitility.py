@@ -1,5 +1,3 @@
-# pymc3_bayes_stochastic_vol.py
-
 import datetime
 import pprint
 
