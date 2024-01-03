@@ -1,5 +1,3 @@
-# intraday_ml_backtest.py
-
 import datetime
 
 from qstrader import settings
