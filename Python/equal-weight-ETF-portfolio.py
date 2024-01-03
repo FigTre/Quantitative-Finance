@@ -1,5 +1,3 @@
-# equal_weight_etf_portfolio_backtest.py
-
 import datetime
 
 from qstrader import settings
