@@ -1,80 +1,3 @@
-#' add a rule to a strategy
-#' 
-#' Rules will be processed in a very particular manner, so it bears going over.
-#' 
-#' First, rules are either path dependent or non-path-dependent.  Path dependent rules 
-#' will be processed in every time increment for the \code{mktdata} passed into
-#' \code{\link{applyStrategy}}.  Non path dependent rules will likely be quite rare in real life, 
-#' and will be applied after indicators and signals, and before path-dependent rules are processed.
-#' 
-#' 
-#' All rules have a \code{type}.  These may be any of:
-#' \describe{
-#'   \item{risk}{ rules that check and react to risk of positions, may stop all other rule execution temporarily or permanently}
-#'   \item{order}{ rules for order processing of any open orders at time t, always path-dependent}
-#'   \item{rebalance}{ rules executed specifically in a portfolio context, unnecessary in univariate strategies}
-#'   \item{exit}{ rules to determine whether to exit a position}
-#'   \item{enter}{ rules to determine whether to enter or increase a position}
-#'   \item{chain}{ rules executed upon fill of an order corresponding to the label of the parent rule identified by the \code{parent} arg. }
-#' } 
-#'  
-#' The rules will be executed by type, in the order listed above.  
-#' Multiple rules of each type may be defined, as with signals and indicators, 
-#' they will be executed in order by index number with any other rules sharing the same 
-#' type.
-#' 
-#' The rule execution order was constructed because path-dependent rules may modify   
-#' the ability of rules that have not fired yet to be evaluated.  For example, a 
-#' risk rule may flatten (close out) an entire position and put new orders 
-#' on hold, effectively stopping all further execution of the strategy.  
-#' Another example would be a rebalancing rule function that would enter 
-#' orders to rebalance the portfolio, and would hold other strategy processing 
-#' until the rebalancing period was over.
-#' 
-#' The \code{timespan} parameter will limit rule execution by time of day using 
-#' time based subsetting.  See ISO-8601 specification and xts documentation for 
-#' more details.  Note that these are only applicable to intra-day execution, 
-#' and will remain that way barring patches (tests and documentation) from 
-#' interested parties.  The subsetting may (will likely) work with normal 
-#' ISO/xts subset ranges, but consider it unsupported. 
-#' 
-#' The \code{name} parameter should be a character string naming the function
-#' to be called in the \code{\link{applyRules}} loop. The \code{add.rule} 
-#' function will then call \code{\link{match.fun}}, ands store the actual function 
-#' in your strategy object.  
-#' This will avoid lookups via \code{\link{match.fun}} at \code{\link{applyRules}} time, 
-#' and may provide a significant speed increase on higher frequency data (20\% or more).
-#' 
-#' We anticipate that rules will be the portion of a strategy most likely to 
-#' not have suitable template code included with this package, as every strategy 
-#' and environment are different, especially in this respect.  
-#' We will attempt to provide enough examples and generic rules to give strategy
-#' authors a place to start.
-#' 
-#' For quantstrat to be able to (largly) vectorize the execution of path-dependent 
-#' rule evaluation, the rule function is presumed to have a function signature 
-#' like that of \code{\link{ruleSignal}}, specifically the arguments \code{sigcol} 
-#' and \code{sigval}.  If these are present and function in a manner similar to 
-#' \code{\link{ruleSignal}} we can do some preprocessing to significantly reduce the 
-#' dimensionality of the index we need to loop over.  The speedup is the ratio of 
-#' (symbols\*total observations)/signal observations, so it can be significant for many strategies.
-#' 
-#' @param strategy an object of type 'strategy' to add the rule to
-#' @param name name of the rule, must correspond to an R function
-#' @param arguments named list of default arguments to be passed to an rule function when executed
-#' @param parameters vector of strings naming parameters to be saved for apply-time definition
-#' @param label arbitrary text label for rule output, NULL default will be converted to '<name>.rule'
-#' @param type one of "risk","order","rebalance","exit","enter","chain" see Details
-#' @param parent the label of the parent rule for a chain rule
-#' @param ... any other passthru parameters
-#' @param enabled TRUE/FALSE whether the rule is enabled for use in applying the strategy, default TRUE
-#' @param indexnum if you are updating a specific rule, the index number in the $rules[type] list to update
-#' @param path.dep TRUE/FALSE whether rule is path dependent, default TRUE, see Details 
-#' @param timespan an xts/ISO-8601 style \emph{time} subset, like "T08:00/T15:00", see Details
-#' @param store TRUE/FALSE whether to store the strategy in the .strategy environment, or return it.  default FALSE
-#' @param storefun TRUE/FALSE whether to store the function in the rule, default TRUE.  setting this option to FALSE may slow the backtest, but makes \code{\link{debug}} usable
-#' @return if \code{strategy} was the name of a strategy, the name. It it was a strategy, the updated strategy. 
-#' @export
 add.rule <- function(strategy
                      , name
                      , arguments
@@ -146,18 +69,6 @@ add.rule <- function(strategy
     strategy$name
 }
 
-#' enable a rule in the strategy
-#'
-#' function to make it easy to enable (or disable) a specific rule in a strategy
-#'
-#' @param strategy an object of type 'strategy' which contains the rule
-#' @param type one of "risk","order","rebalance","exit","enter","chain"
-#' @param label the label for the rule; grep will be used to match, so multiple rules may be enabled (disabled) as a result
-#' @param enabled TRUE/FALSE whether the rule is enabled for use in applying the strategy, default TRUE
-#' @param store TRUE/FALSE whether to store the updated strategy in the .strategy environment, or return it.  default FALSE
-#' @seealso \code{\link{add.rule}} \code{\link{applyStrategy}} 
-#' @export
-
 enable.rule <- function(strategy, type=c(NULL,"risk","order","rebalance","exit","enter","chain"), label, enabled=TRUE, store=FALSE)
 {
     if (!is.strategy(strategy)) {
@@ -176,93 +87,6 @@ enable.rule <- function(strategy, type=c(NULL,"risk","order","rebalance","exit",
     strategy$name
 }
 
-#' apply the rules in the strategy to arbitrary market data 
-#' 
-#' In typical usage, this function will be called via \code{\link{applyStrategy}}.  
-#' In this mode, this function will be called twice, once with \code{path.dep=FALSE} 
-#' and then again in stepping over the time indexes of the mktdata object.
-#' 
-#' This function, because of its path dependent nature and the order of rule 
-#' evaluation discussed in \code{\link{add.rule}}, will likely take up most of the 
-#' execution time of a strategy backtest.
-#' 
-#' Individual rule functions may need to use <<- to place \code{hold} and \code{holdtill}
-#' variables into play.  These would be most likely implemented by risk rules.  When
-#' \code{hold==TRUE}, any open oders will still be processed (orders are \emph{NOT} 
-#' canceled automatically, but no new orders may be entered.  \code{type='risk'}
-#' rules will still function during a hold.  Note that hold must be set via a custom
-#' rule.  We tend to set hold in an order or risk rule. 
-#' 
-#' \code{quantstrat} has a significant amount of logic devoted to handling 
-#' path-dependent rule execution.  Most of that code/logic resides in this
-#' function.  
-#' 
-#' This function, along with \code{\link{ruleOrderProc}}, \code{\link{addOrder}}, and 
-#' \code{\link{applyStrategy}} will likely need to be replaced to connect to a live 
-#' market infrastructure. 
-#' 
-#' 
-#' @section Dimension Reduction for Performance:
-#' In evaluation of path-dependent rules, the simplest method, 
-#' and the one we used initially, is to check the rules on every observation 
-#' in the time series of market data.  
-#' There are cases where this will still be required, but we hope to limit them as much as possible.
-#' Looping in \R is generally discouraged, and on high frequency data for 
-#' strategy evaluation it can produce completely unacceptable results.
-#' 
-#' The solution we've employed is to utilize a state machine to evaluate the rules only 
-#' when deemed necessary.
-#' This approach makes use of what we know about the strategy and
-#' the orders the strategy places (or may place) to reduce the dimensionality of the problem.
-#' 
-#' As discussed in \code{\link{add.rule}}, the first step in this dimension 
-#' reduction is to look for places in the time series where signals may cause the strategy to 
-#' enter or change orders.  This creates an index of timestamps that must be evaluated.
-#' This index should be significantly shorter than the full number of observations.    
-#' \code{quantstrat} will always run \code{applyRules} on each of these indices
-#' where we've previously figured out that the strategy might want to do something.
-#' 
-#' The next step in dimension reduction works on the order book.  
-#' If there are open orders, we need to figure out when they might get filled.  
-#' For market orders, this is the next observation.  For limit orders, we can 
-#' locate the index timestamps after the order is placed to see when the
-#' order might cross.  We will add this index to the list of indices to be 
-#' evaluated.  There is of course no guarantee that the order will still be 
-#' open at that time, that trading will not be on \code{hold} because of a risk rule, 
-#' or that something else hasn't interfered.  Adding the index to the list only tells
-#' the loop inside \code{applyRules} that rules (including order processing rules) 
-#' need to be checked at that index, to see if anything needs to happen.
-#' 
-#' For trailing orders, the picture is somewhat more complicated.  Trailing orders
-#' \emph{may} move on each new observation, per the method described in 
-#' \code{\link{addOrder}}. To speed up evaluation of when such an
-#' order may cross, we need to combine the possible crossing logic for 
-#' the limit orders, above, with some additional logic to handle the 
-#' trailing orders. We begin by evaluating when the order price might 
-#' be moved. We then examine the market data between the current index and 
-#' the point at which the order may move. if there is a (possible) cross, 
-#' we insert that index into the indices for examination.  If not, we insert 
-#' the index of the next probable move.
-#' 
-#' It should be noted that this dimension reduction methodology does 'look ahead'
-#' in the data.  This 'look ahead' is only done \emph{after} the order has been 
-#' entered in the normal path-dependent process, and only to insert new indices for 
-#' evaluation, and so should not introduce biases.
-#'      
-#' @param portfolio text name of the portfolio to associate the order book with
-#' @param symbol identfier of the instrument to find orders for.  The name of any associated price objects (xts prices, usually OHLC) should match these
-#' @param strategy an object of type 'strategy' to add the rule to
-#' @param mktdata an xts object containing market data.  depending on rules, may need to be in OHLCV or BBO formats, and may include indicator and signal information
-#' @param indicators if indicator output is not contained in the mktdata object, it may be passed separately as an xts object or a list.
-#' @param signals if signal output is not contained in the mktdata object, it may be passed separately as an xts object or a list.
-#' @param parameters named list of parameters to be applied during evaluation of the strategy,default NULL, only needed if you need special names to avoid argument collision
-#' @param ... any other passthru parameters
-#' @param path.dep TRUE/FALSE whether rule is path dependent, default TRUE, see Details 
-#' @param rule.order default NULL, use at your own risk to adjust order of rule evaluation
-#' @param debug if TRUE, return output list
-#' @param rule.subset ISO-8601 subset for period to execute rules over, default NULL
-#' @seealso \code{\link{add.rule}} \code{\link{applyStrategy}} 
-#' @export
 applyRules <- function(portfolio, 
                         symbol, 
                         strategy, 
@@ -324,7 +148,7 @@ applyRules <- function(portfolio,
     
     Dates <- index(mktdata)
     
-    #we could maybe do something more sophisticated, but this should work
+  
     if(isTRUE(path.dep)){ #initialize the dimension reduction index (dindex)
         dindex<-c(first.index,last.index) # set the dimension reduction/loop jumping index vector
         assign.dindex(dindex)
@@ -361,27 +185,21 @@ applyRules <- function(portfolio,
         }
         dindex<-get.dindex()
               
-        #rule subsetting will decrease the periods we evaluate rules for
+      
         if(!is.null(rule.subset)){
           assign.dindex(c(mktdata[rule.subset,which.i=TRUE][1]
                           ,dindex[which(dindex %in% mktdata[rule.subset,which.i=TRUE])]))
           dindex <- get.dindex()
-          #print('included indices:')
-          #print(dindex)
         }
         
         if(length(dindex)==0) return(NULL) # not sure if NULL will cause other issues...
         
-        #for debugging, set dindex to all index values:
-        #assign.dindex(1:length(index(mktdata)))
-        #print(dindex)
     } else {
         Dates=''
         dindex=first.index
     } # end dindex initialization
 
-    # Find the next index the market will cross a resting order's price
-    # or if we need to move a trailing order. Returns a named list.
+   
     dindexOrderProc <- function(Order, mktPrices, curIndex) {
         out <- list()
 
@@ -398,11 +216,9 @@ applyRules <- function(portfolio,
         orderQty <- as.numeric(orderQty)
         orderPrice <- as.numeric(Order[1L,'Order.Price'])
         orderType <- Order[1L,'Order.Type']
-
-        # default mktPrice
         mktPrice <- mktPrices[[orderType]]$price
 
-        # process order
+      # process order
         if (orderQty > 0) {  # buying
             # determine relationship
             relationship <-
@@ -428,12 +244,10 @@ applyRules <- function(portfolio,
                 low_mktPrice <- mktPrices[[orderType]]$negQty      # used for determining if stoptrailing order trades
                 high_mktPrice <- mktPrices[[orderType]]$posQty     # used for determining if stoptrailing order price needs to be adjusted due to new high
         }
-        # ensure we have a mktPrice
         if (is.null(mktPrice) || (length(mktPrice) == 1L && is.na(mktPrice)))
             stop("no price discernable for ", orderType, " in applyRules")
 
-        # use .firstCross to find the location of the first orderPrice that crosses mktdata[,col]
-        # *after* curIndex, since that is the soonest we can get filled.
+       
         if(orderType %in% "stoptrailing") {
             if(orderQty > 0) {
                 out$cross <- .firstCross(high_mktPrice, orderPrice, relationship, start=curIndex+1L)
@@ -485,7 +299,7 @@ applyRules <- function(portfolio,
             if(nrow(ordersubset[oo.idx,][timespan])==0 &&                   # prior open orders already in dindex; no need to recheck
                !any(ordersubset[oo.idx,"Order.Type"] %in% "stoptrailing"))  # ... but trailing orders may need to move
             {
-                # no open orders between now and the next index
+                
                 nidx=FALSE
             } else {
 
@@ -500,7 +314,6 @@ applyRules <- function(portfolio,
                 }
 
                 # process open resting, but non-trailing orders
-                # - dindex can be updated after processing all open orders
                 openOrders <- which(openOrderSubset[,'Order.Type'] %in% c("limit","stoplimit"))
                 if(length(openOrders) > 0) {
                     # dindexOrderProc$cross will be nrow(x) if there's no cross, and nrow(x) is always in dindex
@@ -509,8 +322,6 @@ applyRules <- function(portfolio,
                 }
 
                 # process open trailing orders
-                # - dindex should be updated after processing each open trailing order,
-                #   regardless of trailing order type (only stoptrailing is currently implemented)
                 openOrders <- which(openOrderSubset[,'Order.Type'] %in% "stoptrailing")
                 for(openOrder in openOrders)
                 {
@@ -543,9 +354,6 @@ applyRules <- function(portfolio,
         }
         
         if (is.na(curIndex) || curIndex > length(Dates)) curIndex=FALSE
-
-        #debug line
-        #print(paste('curIndex ==', curIndex))
         
         return(curIndex)
     } # end function nextIndex
@@ -557,14 +365,11 @@ applyRules <- function(portfolio,
     if(nrow(mktdata)>1)
         freq <- periodicity(mktdata)  # run once and pass to ruleOrderProc
     else {
-        # For applyStrategy.rebalancing, which could run on a 1-row subset of mktdata
-        # This should work for all index classes in ruleOrderProc's default switch expression
         freq <- structure(list(difftime = structure(NA, units="secs", class="difftime"), 
             frequency=1, start=start(mktdata), end=end(mktdata), units="secs", 
             scale="seconds", label="second"), class="periodicity")
     }
     
-    # do order price subsetting outside of nextIndex and curIndex loop
     # this avoids repeated [.xts calls; and mktPrices is never altered, so copies aren't made
     if(is.BBO(mktdata)) {
         mktPrices <- list(
@@ -740,7 +545,7 @@ ruleProc <- function (ruletypelist,timestamp=NULL, path.dep, ruletype, ..., para
                 next()
         }
         
-        # modify a few things
+      
         rule$arguments$timestamp = timestamp
         rule$arguments$ruletype  = ruletype
         rule$arguments$label = rule$label
@@ -764,17 +569,3 @@ ruleProc <- function (ruletypelist,timestamp=NULL, path.dep, ruletype, ..., para
 #            print(paste('tmp_val ==', tmp_val))
     } #end rules loop
 } # end sub process function ruleProc
-
-###############################################################################
-# R (http://r-project.org/) Quantitative Strategy Model Framework
-#
-# Copyright (c) 2009-2015
-# Peter Carl, Dirk Eddelbuettel, Brian G. Peterson, 
-# Jeffrey Ryan, Joshua Ulrich, and Garrett See 
-#
-# This library is distributed under the terms of the GNU Public License (GPL)
-# for full details see the file COPYING
-#
-# $Id$
-#
-###############################################################################
