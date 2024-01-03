@@ -1,5 +1,3 @@
-# coint_bollinger_strategy.py
-
 from __future__ import print_function
 
 from collections import deque
