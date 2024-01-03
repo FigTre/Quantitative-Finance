@@ -1,25 +1,3 @@
-#' Chart to analyse walk.forward() objective function
-#'
-#' The \code{\link{walk.forward}} function creates an audit environment,  potentially written 
-#' out as a results file, which contains the out of sample results of the (chosen)
-#' parameter set.  This function parses that file  or environment and generates a chart to 
-#' compare the performance of all parameter sets against the optimal one. 
-#'
-#' \code{\link{chart.forward.training}} uses the audit environment for a single 
-#' in-sample training period to draw a chart for that in-sample data.
-#' 
-#' Note that parameter \code{audit filename} may also be an audit environment 
-#' which is already loaded in \R, for ease of development and debugging.  Little
-#' checking is done to ensure the correct structure of this environment, so passing
-#' an unsuitable environment (such as the .blotter environment) will result in
-#' errors.
-#' 
-#' @param audit.filename name of .audit environment file as produced by \code{\link{walk.forward}}
-#'        Filename will often match pattern [audit.prefix].results.RData. Alternately, an
-#'        audit environment provided by the output of \code{\link{walk.forward}}
-#' @param portfolio.st string defining which portfolio should be used for out of sample, default NULL
-#' @seealso \code{\link{walk.forward}}, \code{\link{chart.forward.training}}
-#' @export
 chart.forward <- function(audit.filename, portfolio.st=NULL)
 {
   if(is.environment(audit.filename)){
@@ -43,9 +21,9 @@ chart.forward <- function(audit.filename, portfolio.st=NULL)
   }
 
   if(length(ls(name=.audit,pattern='blotter'))){ 
-    # post 0.12.0 audit environment
+   
     
-    #get performance from OOS result portfolio (which doesn't end in a digit)
+    #get performance from OOS result portfolio
     if(is.null(portfolio.st) && !is.null(.audit$portfolio.st)){
       portfolio.st <- .audit$portfolio.st
     } else {
@@ -107,7 +85,7 @@ chart.forward <- function(audit.filename, portfolio.st=NULL)
   
     # add a column for the chosen portfolio, doubling it and
     # making it plot last (first column, per PerfA convention) 
-    # so it's not over-plotted by other portfolios
+   
     PL.xts <- cbind(R, PL.xts)
     
     PL.xts <- na.locf(PL.xts)
