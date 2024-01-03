@@ -1,5 +1,3 @@
-# intraday_ml_strategy.py
-
 import numpy as np
 import pandas as pd
 from sklearn.externals import joblib
