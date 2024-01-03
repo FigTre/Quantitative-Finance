@@ -1,5 +1,3 @@
-# ensemble_prediction.py
-
 import datetime
 
 import matplotlib.pyplot as plt
