@@ -1,1 +1,1 @@
-Code for Quantative Trading
+Code For Quantative Trading
