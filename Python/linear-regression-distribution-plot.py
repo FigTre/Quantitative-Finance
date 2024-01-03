@@ -1,5 +1,3 @@
-# lin_reg_distribution_plot.py
-
 from matplotlib import cm
 from matplotlib.ticker import LinearLocator, FormatStrFormatter
 import matplotlib.pyplot as plt
